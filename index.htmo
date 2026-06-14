@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>暗夜明牌局 - 10人特殊叛變版</title>
+    <style>
+        :root {
+            --bg-color: #121214;
+            --card-bg: #1e1e24;
+            --primary: #e63946;
+            --text: #f1faee;
+            --accent: #457b9d;
+            --success: #4ade80;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            box-sizing: border-box;
+            text-align: center;
+        }
+        h1, h2, h3 { color: var(--primary); margin-top: 0; }
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 20px;
+            width: 100%;
+            transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.98); }
+        .hidden { display: none !important; }
+        .role-card {
+            background: #2a2a35;
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            border: 2px solid var(--accent);
+            font-size: 24px;
+            font-weight: bold;
+        }
+        select, input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            background: #2a2a35;
+            color: white;
+            border: 1px solid var(--accent);
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        .log-box {
+            background: #0f0f13;
+            text-align: left;
+            padding: 12px;
+            border-radius: 8px;
+            max-height: 220px;
+            overflow-y: auto;
+            font-size: 14px;
+            color: #a8dadc;
+            line-height: 1.6;
+        }
+        .result-badge {
+            background: #457b9d;
+            padding: 8px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 10px;
+            font-size: 16px;
+        }
+        .skill-desc {
+            font-size: 13px;
+            color: #a8dadc;
+            text-align: left;
+            background: #15151a;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="setup-screen">
+        <h1>暗夜明牌局 (10人特殊版)</h1>
+        <p>配置：3狼、3民、1預、1女、1叛徒、1調停者</p>
+        <h2 id="player-setup-title">請 1 號玩家拿著手機</h2>
+        <input type="text" id="player-name" placeholder="輸入你的名字或暱稱">
+        <button onclick="lockInPlayer()">確認身分並抽牌</button>
+    </div>
+
+    <div id="privacy-screen" class="hidden">
+        <h1>請傳遞手機</h1>
+        <h2 id="privacy-target">請將手機交給下一個人</h2>
+        <button onclick="revealRoleScreen()">我已拿到手機，點擊查看</button>
+    </div>
+
+    <div id="role-screen" class="hidden">
+        <h2 id="role-owner-name">玩家身分</h2>
+        <p>確認四下無人後，點擊下方按鈕看牌</p>
+        <button id="btn-toggle-role" onclick="toggleRoleVisibility()">顯示我的底牌</button>
+        <div id="role-card-display" class="role-card hidden"></div>
+        <button id="btn-role-done" onclick="nextPlayerRole()" class="hidden">確認，傳給下一位</button>
+    </div>
+
+    <div id="night-screen" class="hidden">
+        <h1>🌙 天黑請閉眼</h1>
+        <h2 id="night-player-title">請玩家拿著手機</h2>
+        <p id="night-prompt">準備進入你的夜間行動</p>
+        <button onclick="startNightAction()">開始行動</button>
+    </div>
+
+    <div id="action-screen" class="hidden">
+        <h2 id="action-title">夜間行動中</h2>
+        <div id="action-form"></div>
+        <div id="action-result" class="hidden"></div>
+        <button onclick="submitNightAction()">完成行動並鎖定</button>
+    </div>
+
+    <div id="day-screen" class="hidden">
+        <h1>☀️ 天亮請睜眼</h1>
+        <div class="role-card" id="day-result" style="border-color: #e63946;"></div>
+        <h3>昨晚事件記錄（明牌提示）：</h3>
+        <div class="log-box" id="day-logs"></div>
+        <button onclick="restartGame()">重新開始新對局</button>
+    </div>
+</div>
+
+<script>
+    // 10人精準配置
+    const ROLES_POOL = ['狼人', '狼人', '狼人', '預言家', '女巫', '叛徒', '調停者', '平民', '平民', '平民'];
+    let players = []; 
+    let currentSetupIndex = 0;
+    let currentNightIndex = 0;
+
+    // 特殊角色狀態全局控制
+    let witchHasHeal = true;
+    let witchHasPoison = true;
+    let mediatorHasSkill = true; // 調停者全場限一次
+    let traitorAwakened = false; // 叛徒是否已覺醒為狼人陣營
+
+    let nightData = {
+        wolfTarget: null,
+        seerTarget: null,
+        witchHeal: false,
+        witchPoison: null,
+        mediatorTarget1: null,
+        mediatorTarget2: null
+    };
+
+    function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+    const shuffledRoles = shuffle([...ROLES_POOL]);
+
+    function lockInPlayer() {
+        const nameInput = document.getElementById('player-name');
+        const name = nameInput.value.trim() || `玩家 ${currentSetupIndex + 1}`;
+        
+        players.push({
+            id: currentSetupIndex + 1,
+            name: name,
+            role: shuffledRoles[currentSetupIndex]
+        });
+
+        nameInput.value = '';
+        showPrivacyScreen(currentSetupIndex, 'setup');
+    }
+
+    function showPrivacyScreen(currentIndex, mode) {
+        document.getElementById('setup-screen').classList.add('hidden');
+        document.getElementById('role-screen').classList.add('hidden');
+        document.getElementById('night-screen').classList.add('hidden');
+        document.getElementById('action-screen').classList.add('hidden');
+        
+        const privacy = document.getElementById('privacy-screen');
+        const targetText = document.getElementById('privacy-target');
+        privacy.classList.remove('hidden');
+
+        if (mode === 'setup') {
+            if (currentIndex < 9) {
+                targetText.innerText = `請將手機交給 ${currentIndex + 2} 號玩家`;
+                privacy.querySelector('button').setAttribute('onclick', 'revealRoleScreen()');
+            } else {
+                targetText.innerText = `所有人抽牌完畢！請將手機交回 1 號玩家，準備進入天黑`;
+                privacy.querySelector('button').setAttribute('onclick', 'goToNightPhase()');
+            }
+        } else if (mode === 'night') {
+            if (currentIndex < 9) {
+                targetText.innerText = `請將手機交給下一個順位：${players[currentIndex + 1].name}`;
+                privacy.querySelector('button').setAttribute('onclick', 'revealNightScreen()');
+            } else {
+                targetText.innerText = `所有人行動完畢！請點擊查看天亮結算結果`;
+                privacy.querySelector('button').setAttribute('onclick', 'processDaybreak()');
+            }
+        }
+    }
+
+    function revealRoleScreen() {
+        document.getElementById('privacy-screen').classList.add('hidden');
+        const screen = document.getElementById('role-screen');
+        screen.classList.remove('hidden');
+        
+        document.getElementById('role-owner-name').innerText = `${players[currentSetupIndex].name} 的身分`;
+        const card = document.getElementById('role-card-display');
+        card.innerText = players[currentSetupIndex].role;
+        card.classList.add('hidden');
+        
+        document.getElementById('btn-toggle-role').classList.remove('hidden');
+        document.getElementById('btn-role-done').classList.add('hidden');
+    }
+
+    function toggleRoleVisibility() {
+        const card = document.getElementById('role-card-display');
+        card.classList.toggle('hidden');
+        document.getElementById('btn-role-done').classList.remove('hidden');
+    }
+
+    function nextPlayerRole() {
+        currentSetupIndex++;
+        if (currentSetupIndex < 10) {
+            document.getElementById('role-screen').classList.add('hidden');
+            document.getElementById('setup-screen').classList.remove('hidden');
+            document.getElementById('player-setup-title').innerText = `請 ${currentSetupIndex + 1} 號玩家拿著手機`;
+        }
+    }
+
+    function goToNightPhase() {
+        document.getElementById('privacy-screen').classList.add('hidden');
+        document.getElementById('night-screen').classList.remove('hidden');
+        currentNightIndex = 0;
+        updateNightScreenFields();
+    }
+
+    function updateNightScreenFields() {
+        document.getElementById('night-player-title').innerText = `請 ${players[currentNightIndex].name} 拿著手機`;
+        document.getElementById('night-prompt').innerText = `確認周圍無人後，點擊按鈕開始你的夜間行動。`;
+    }
+
+    function revealNightScreen() {
+        document.getElementById('privacy-screen').classList.add('hidden');
+        document.getElementById('night-screen').classList.remove('hidden');
+        updateNightScreenFields();
+    }
+
+    // 生成玩家選擇下拉選單
+    function generatePlayerSelect(id, placeholder) {
+        let html = `<select id="${id}"><option value="">-- ${placeholder} --</option>`;
+        players.forEach(pl => {
+            html += `<option value="${pl.id}">${pl.id}號 - ${pl.name}</option>`;
+        });
+        html += `</select>`;
+        return html;
+    }
+
+    // 啟動夜間行動與動態表單生成
+    function startNightAction() {
+        document.getElementById('night-screen').classList.add('hidden');
+        const actionScreen = document.getElementById('action-screen');
+        actionScreen.classList.remove('hidden');
+
+        const p = players[currentNightIndex];
+        
+        // 額外顯示叛徒的覺醒狀態
+        let displayRole = p.role;
+        if (p.role === '叛徒') {
+            displayRole = traitorAwakened ? '叛徒 (🔥已覺醒為狼人陣營)' : '叛徒 (🕊️好人陣營・未覺醒)';
+        }
+
+        document.getElementById('action-title').innerText = `${p.name} (身分: ${displayRole})`;
+        
+        const formDiv = document.getElementById('action-form');
+        const resultDiv = document.getElementById('action-result');
+        formDiv.innerHTML = '';
+        resultDiv.innerHTML = '';
+        resultDiv.classList.add('hidden');
+
+        // 根據角色進行操作介面編排
+        if (p.role === '狼人' || (p.role === '叛徒' && traitorAwakened)) {
+            formDiv.innerHTML = `
+                <div class="skill-desc">🐺 <strong>狼人陣營行動：</strong><br>請與隊友商討後，選擇今晚想擊殺的目標（重複提交會以最後一人的選擇為最終目標）。</div>
+                <p>請選擇今晚襲擊目標：</p>
+            ` + generatePlayerSelect('wolf-select', '選擇擊殺目標（或空刀）');
+        } 
+        else if (p.role === '預言家') {
+            formDiv.innerHTML = `
+                <div class="skill-desc">🔮 <strong>預言家技能：</strong><br>每晚可以查驗一名玩家。系統將直接顯示其為好人或壞人。</div>
+                <p>請選擇查驗目標：</p>
+            ` + generatePlayerSelect('seer-select', '選擇查驗目標') + 
+            `<button type="button" style="background:#457b9d; margin-top:10px;" onclick="checkSeerIdentity()">立刻執行查驗</button>`;
+        } 
+        else if (p.role === '女巫') {
+            let witchHtml = `<div class="skill-desc">🧪 <strong>女巫技能：</strong><br>擁有解藥與毒藥各一瓶。明牌局可看到當晚狼人擊殺的目標。</div>`;
+            if (witchHasHeal) {
+                let victimText = nightData.wolfTarget ? `${nightData.wolfTarget} 號玩家` : '無人被殺';
+                witchHtml += `<p>🦉 昨晚被狼人擊殺的是：<strong style="color:#e63946">${victimText}</strong></p>`;
+                witchHtml += `<p>是否使用解藥復活他？</p>
+                              <select id="witch-heal-select">
+                                <option value="no">否</option>
+                                <option value="yes">是</option>
+                              </select>`;
+            } else {
+                witchHtml += `<p style="color:#888;">❌ 你已經使用過解藥了。</p>`;
+            }
+
+            if (witchHasPoison) {
+                witchHtml += `<p>是否使用毒藥毒殺一名玩家？</p>` + generatePlayerSelect('witch-poison-select', '不使用毒藥');
+            } else {
+                witchHtml += `<p style="color:#888;">❌ 你已經使用過毒藥了。</p>`;
+            }
+            formDiv.innerHTML = witchHtml;
+        } 
+        else if (p.role === '調停者') {
+            if (mediatorHasSkill) {
+                formDiv.innerHTML = `
+                    <div class="skill-desc">⚖️ <strong>調停者技能：</strong><br>全場限用一次。指定兩名玩家，在當天白天的投票階段中，這兩個人不得互相投票。</div>
+                    <p>是否要在今晚發動技能？</p>
+                    <select id="mediator-use-select" onchange="toggleMediatorFields(this.value)">
+                        <option value="no">否，今晚不使用</option>
+                        <option value="yes">是，今晚要發動技能</option>
+                    </select>
+                    <div id="mediator-targets" class="hidden" style="margin-top: 15px;">
+                        <p>請指定限制投票的第一位玩家：</p>
+                        ${generatePlayerSelect('mediator-t1', '選擇玩家 A')}
+                        <p>請指定限制投票的第二位玩家：</p>
+                        ${generatePlayerSelect('mediator-t2', '選擇玩家 B')}
+                    </div>
+                `;
+            } else {
+                formDiv.innerHTML = `<div class="skill-desc">⚖️ <strong>調停者技能：</strong><br>你的調停技能在本局遊戲中已經使用過了。</div><p style="color:#888;">今晚平安閉眼休息...</p>`;
+            }
+        } 
+        else {
+            // 平民、或尚未覺醒的叛徒
+            formDiv.innerHTML = `<p style="color:#a8dadc; font-style:italic;">你今晚平安無事，閉眼休息中...</p>`;
+        }
+    }
+
+    // 調停者專用：切換指定人選下拉選單的顯示
+    function toggleMediatorFields(val) {
+        const targetDiv = document.getElementById('mediator-targets');
+        if (val === 'yes') {
+            targetDiv.classList.remove('hidden');
+        } else {
+            targetDiv.classList.add('hidden');
+        }
+    }
+
+    // 預言家專用：夜間現場驗人
+    function checkSeerIdentity() {
+        const targetId = document.getElementById('seer-select').value;
+        const resultDiv = document.getElementById('action-result');
+        if (!targetId) {
+            alert('請先選擇一個查驗目標！');
+            return;
+        }
+        const targetPlayer = players.find(pl => pl.id == targetId);
+        
+        // 叛徒若未覺醒，預言家驗出來是好人；若已覺醒，則為壞人
+        let isEvil = targetPlayer.role === '狼人';
+        if (targetPlayer.role === '叛徒' && traitorAwakened) {
+            isEvil = true;
+        }
+        
+        resultDiv.className = "result-badge";
+        resultDiv.classList.remove('hidden');
+        resultDiv.innerHTML = `查驗結果：${targetPlayer.id}號 ${targetPlayer.name} 是 <strong style="color:${isEvil ? '#e63946':'#4ade80'}">${isEvil ? '壞人 (狼人陣營)' : '好人 (好人陣營)'}</strong>`;
+        nightData.seerTarget = targetId;
+    }
+
+    // 提交夜間行動並進入下一個傳閱步驟
+    function submitNightAction() {
+        const p = players[currentNightIndex];
+
+        if (p.role === '狼人' || (p.role === '叛徒' && traitorAwakened)) {
+            const val = document.getElementById('wolf-select').value;
+            if (val) nightData.wolfTarget = parseInt(val);
+        } 
+        else if (p.role === '預言家') {
+            const val = document.getElementById('seer-select').value;
+            if (val) nightData.seerTarget = parseInt(val);
+        } 
+        else if (p.role === '女巫') {
+            if (witchHasHeal) {
+                const healVal = document.getElementById('witch-heal-select').value;
+                if (healVal === 'yes') {
+                    nightData.witchHeal = true;
+                    witchHasHeal = false; 
+                }
+            }
+            if (witchHasPoison) {
+                const poisonVal = document.getElementById('witch-poison-select').value;
+                if (poisonVal) {
+                    nightData.witchPoison = parseInt(poisonVal);
+                    witchHasPoison = false; 
+                }
+            }
+        }
+        else if (p.role === '調停者' && mediatorHasSkill) {
+            const useSkill = document.getElementById('mediator-use-select').value;
+            if (useSkill === 'yes') {
+                const t1 = document.getElementById('mediator-t1').value;
+                const t2 = document.getElementById('mediator-t2').value;
+                if (t1 && t2 && t1 !== t2) {
+                    nightData.mediatorTarget1 = parseInt(t1);
+                    nightData.mediatorTarget2 = parseInt(t2);
+                    mediatorHasSkill = false; // 標記已消耗
+                } else if (t1 === t2 && t1 !== "") {
+                    alert('調停對象不能是同一個人！請重新選擇或取消發動。');
+                    return;
+                }
+            }
+        }
+
+        showPrivacyScreen(currentNightIndex, 'night');
+    }
+
+    function revealNightScreen() {
+        currentNightIndex++;
+        document.getElementById('privacy-screen').classList.add('hidden');
+        document.getElementById('night-screen').classList.remove('hidden');
+        updateNightScreenFields();
+    }
+
+    // 天亮結算核心邏輯
+    function processDaybreak() {
+        document.getElementById('privacy-screen').classList.add('hidden');
+        document.getElementById('day-screen').classList.remove('hidden');
+
+        let deaths = [];
+        let logText = "";
+        let traitorStatusChanged = false;
+
+        // 1. 計算狼人襲擊與女巫解藥 (並連動判定叛徒是否覺醒)
+        if (nightData.wolfTarget) {
+            // 找出被咬的人是誰
+            let victimPlayer = players.find(pl => pl.id === nightData.wolfTarget);
+            
+            if (nightData.witchHeal) {
+                logText += `• 狼人昨晚試圖襲擊了 ${nightData.wolfTarget} 號玩家，但被女巫用解藥救活了。<br>`;
+                
+                // 叛徒核心邏輯：被狼人咬且被救未死 -> 轉為狼人陣營
+                if (victimPlayer && victimPlayer.role === '叛徒' && !traitorAwakened) {
+                    traitorAwakened = true;
+                    traitorStatusChanged = true;
+                }
+            } else {
+                deaths.push(nightData.wolfTarget);
+                logText += `• 狼人昨晚成功襲擊了 ${nightData.wolfTarget} 號玩家。<br>`;
+            }
+        } else {
+            logText += `• 狼人昨晚沒有選擇任何襲擊目標（空刀）。<br>`;
+        }
+
+        // 2. 計算女巫毒藥
+        if (nightData.witchPoison) {
+            deaths.push(nightData.witchPoison);
+            logText += `• 女巫昨晚使用毒藥毒殺了 ${nightData.witchPoison} 號玩家。<br>`;
+        }
+
+        // 3. 揭曉調停者技能結果
+        if (nightData.mediatorTarget1 && nightData.mediatorTarget2) {
+            let m1 = players.find(pl => pl.id === nightData.mediatorTarget1);
+            let m2 = players.find(pl => pl.id === nightData.mediatorTarget2);
+            logText += `<span style="color:#f1faee; background:#457b9d; padding:2px 6px; border-radius:4px;">📢 <b>調停限制：</b> ${m1.id}號 (${m1.name}) 與 ${m2.id}號 (${m2.name}) 受到調停，今天白天投票階段<b>不得互相投票</b>！</span><br>`;
+        }
+
+        // 4. 揭曉預言家查驗軌跡 (明牌資訊)
+        if (nightData.seerTarget) {
+            logText += `• 預言家昨晚查驗了 ${nightData.seerTarget} 號玩家的底牌。<br>`;
+        }
+
+        // 5. 顯示叛徒覺醒明牌公告
+        if (traitorStatusChanged) {
+            let traitorPlayer = players.find(pl => pl.role === '叛徒');
+            logText += `<span style="color:#e63946; font-weight:bold;">🔥 <b>陣營轉換：</b> ${traitorPlayer.id}號玩家 (${traitorPlayer.name}) 被狼人襲擊但未死亡，已成功覺醒並加入【狼人陣營】！下一晚起可與狼人共同行動。</span><br>`;
+        }
+
+        // 去重與排序死亡名單
+        let uniqueDeaths = [...new Set(deaths)].sort((a, b) => a - b);
+        const resultCard = document.getElementById('day-result');
+
+        if (uniqueDeaths.length === 0) {
+            resultCard.innerText = "✨ 昨晚是個平安夜，無人死亡！";
+            resultCard.style.borderColor = "#4ade80";
+        } else {
+            let deathNames = uniqueDeaths.map(id => {
+                let found = players.find(pl => pl.id === id);
+                return `${id}號 (${found.name} - 底牌: ${found.role})`;
+            }).join('、');
+            
+            resultCard.innerHTML = `💀 昨晚死亡的玩家為：<br><span style="font-size:18px; color:#e63946;">${deathNames}</span>`;
+            resultCard.style.borderColor = "#e63946";
+        }
+
+        document.getElementById('day-logs').innerHTML = logText || "昨晚靜悄悄的，什麼都沒發生。";
+
+        // 清空單夜暫存數據，為下一晚做準備
+        nightData.wolfTarget = null;
+        nightData.seerTarget = null;
+        nightData.witchHeal = false;
+        nightData.witchPoison = null;
+        nightData.mediatorTarget1 = null;
+        nightData.mediatorTarget2 = null;
+    }
+
+    function restartGame() {
+        if(confirm('確認要清除目前對局並重新開始嗎？')) {
+            window.location.reload();
+        }
+    }
+</script>
+</body>
+</html>
