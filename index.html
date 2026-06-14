@@ -3,247 +3,609 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>暗夜明牌局 - 9人標準傳閱版</title>
+    <title>10人暗夜明牌局 - 無上帝多裝置聯網版</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         :root {
-            --bg-color: #121214;
-            --card-bg: #1e1e24;
-            --primary: #e63946;
-            --text: #f1faee;
-            --accent: #457b9d;
+            --bg-color: #0b0914;
+            --card-bg: #161326;
+            --primary: #9d4edd;
+            --wolf: #ff477e;
+            --good: #00f5d4;
+            --warn: #ffb703;
+            --text: #e0aaff;
+            --text-light: #ffffff;
         }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color); color: var(--text);
+            padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh;
         }
         .container {
-            width: 100%;
-            max-width: 500px;
-            background: var(--card-bg);
-            border-radius: 16px;
-            padding: 24px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-            box-sizing: border-box;
-            text-align: center;
+            width: 100%; max-width: 480px; background: var(--card-bg);
+            border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+            text-align: center; border: 1px solid #3c096c;
         }
-        h1, h2, h3 { color: var(--primary); margin-top: 0; }
+        h1, h2, h3 { color: var(--text-light); margin-bottom: 10px; }
         button {
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            padding: 14px 28px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 8px;
-            cursor: pointer;
-            margin-top: 20px;
-            width: 100%;
-            transition: transform 0.1s;
+            background-color: var(--primary); color: white; border: none;
+            padding: 14px 20px; font-size: 16px; font-weight: bold;
+            border-radius: 10px; cursor: pointer; margin-top: 15px;
+            width: 100%; transition: all 0.2s;
         }
-        button:active { transform: scale(0.98); }
+        button:active { transform: scale(0.97); }
+        button.btn-sec { background-color: #3c096c; color: #c77dff; }
+        button.btn-danger { background-color: var(--wolf); }
         .hidden { display: none !important; }
         .role-card {
-            background: #2a2a35;
-            padding: 20px;
-            border-radius: 12px;
-            margin: 20px 0;
-            border: 2px solid var(--accent);
-            font-size: 24px;
-            font-weight: bold;
+            background: #240046; padding: 20px; border-radius: 12px;
+            margin: 15px 0; border: 2px solid var(--primary); font-size: 22px; font-weight: bold; color: #fff;
         }
         select, input {
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0;
-            background: #2a2a35;
-            color: white;
-            border: 1px solid var(--accent);
-            border-radius: 6px;
-            font-size: 16px;
-            box-sizing: border-box;
+            width: 100%; padding: 12px; margin: 10px 0;
+            background: #10002b; color: white; border: 1px solid #5a189a;
+            border-radius: 8px; font-size: 16px; text-align: center;
         }
         .log-box {
-            background: #0f0f13;
-            text-align: left;
-            padding: 12px;
-            border-radius: 8px;
-            max-height: 150px;
-            overflow-y: auto;
-            font-size: 14px;
-            color: #a8dadc;
+            background: #10002b; text-align: left; padding: 12px; border-radius: 8px;
+            max-height: 150px; overflow-y: auto; font-size: 14px; color: #e0aaff; line-height: 1.6;
         }
+        .status-board {
+            background: #10002b; padding: 12px; border-radius: 8px; margin: 15px 0; text-align: left; font-size: 14px;
+        }
+        .player-line { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #240046; }
+        .player-line:last-child { border-bottom: none; }
+        .dead { text-decoration: line-through; color: #7b2cbf !important; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div id="setup-screen">
-        <h1>暗夜明牌局 (9人版)</h1>
-        <p>配置：3狼、3民、預言家、女巫、白痴 (無獵人)</p>
-        <h2 id="player-setup-title">請 1 號玩家拿著手機</h2>
-        <input type="text" id="player-name" placeholder="輸入你的名字或暱稱">
-        <button onclick="lockInPlayer()">確認身分並抽牌</button>
+    <div id="lobby-screen">
+        <h1>🐺 10人暗夜明牌局</h1>
+        <p style="color:#7b2cbf; font-size:14px; margin-bottom:15px;">配置：3狼、3民、預、女、調、獵、叛</p>
+        <input type="text" id="user-name" placeholder="請輸入你的暱稱">
+        <div style="margin-top: 20px; border-top: 1px solid #3c096c; padding-top: 15px;">
+            <input type="number" id="room-id-input" placeholder="請輸入 4 位數房號">
+            <button onclick="joinRoom()">加入房間連線</button>
+        </div>
+        <button class="btn-sec" onclick="createRoom()">🔑 創立新房間</button>
     </div>
 
-    <div id="privacy-screen" class="hidden">
-        <h1>請傳遞手機</h1>
-        <h2 id="privacy-target">請將手機交給下一個人</h2>
-        <button onclick="revealRoleScreen()">我已拿到手機，點擊查看</button>
+    <div id="waiting-screen" class="hidden">
+        <h2>房號：<span id="display-room-id" style="color:var(--good)">----</span></h2>
+        <p style="margin: 10px 0;">目前玩家人數 (<span id="current-count">0</span> / 10人)：</p>
+        <div id="player-list-box" class="status-board"></div>
+        <p id="host-hint" style="color: #7b2cbf; font-size:13px;"></p>
+        <button id="start-game-btn" class="hidden" onclick="hostTriggerStart()">🚀 全員到齊，發放底牌</button>
     </div>
 
-    <div id="role-screen" class="hidden">
-        <h2 id="role-owner-name">玩家身分</h2>
-        <p>確認四下無人後，點擊下方按鈕看牌</p>
-        <button id="btn-toggle-role" onclick="toggleRoleVisibility()">顯示我的底牌</button>
-        <div id="role-card-display" class="role-card hidden"></div>
-        <button id="btn-role-done" onclick="nextPlayerRole()" class="hidden">確認，傳給下一位</button>
+    <div id="reveal-screen" class="hidden">
+        <h2>你的身分底牌</h2>
+        <button onclick="toggleRoleCard()">👁️ 顯示 / 隱藏底牌</button>
+        <div id="my-role-card" class="role-card hidden"></div>
+        <p id="my-role-desc" style="color:var(--warn); font-size:14px;" class="hidden"></p>
+        <p style="margin-top:20px; font-size:13px; color:#7b2cbf;">系統將在全體抽牌完成後自動切入黑夜...</p>
     </div>
 
-    <div id="night-screen" class="hidden">
-        <h1>🌙 天黑請閉眼</h1>
-        <h2 id="night-player-title">請玩家拿著手機</h2>
-        <p id="night-prompt">準備進入你的夜間行動</p>
-        <button onclick="startNightAction()">開始行動</button>
-    </div>
-
-    <div id="action-screen" class="hidden">
-        <h2 id="action-title">夜間行動中</h2>
-        <div id="action-form"></div>
-        <button onclick="submitNightAction()">完成行動並鎖定</button>
+    <div id="night-wait-screen" class="hidden">
+        <h1 style="color: #c77dff;">🌙 天黑請閉眼</h1>
+        <p id="night-wait-text" style="margin-top:10px;">請在下方進行你的黑夜秘密行動：</p>
+        <div id="night-action-box" class="hidden">
+            <div id="dynamic-action-form"></div>
+            <button onclick="submitMyNightAction()">🔒 確認提交黑夜行動</button>
+        </div>
     </div>
 
     <div id="day-screen" class="hidden">
-        <h1>☀️ 天亮請睜眼</h1>
-        <div class="role-card" id="day-result" style="border-color: #e63946;"></div>
-        <h3>昨晚事件記錄（明牌提示）：</h3>
-        <div class="log-box" id="day-logs"></div>
-        <button onclick="restartGame()">重新開始新對局</button>
+        <h1 id="day-round-title">☀️ 天亮請睜眼</h1>
+        <div class="role-card" id="day-death-banner" style="border-color: var(--wolf); font-size:18px;"></div>
+        
+        <h3 style="text-align:left; font-size:14px;">🔮 昨晚明牌公告事件：</h3>
+        <div class="log-box" id="day-log-box" style="margin-bottom:15px;"></div>
+        <div id="mediator-ban-banner" style="color: var(--warn); font-weight:bold; margin-bottom:15px; font-size:14px;"></div>
+
+        <div id="hunter-fire-zone" class="hidden" style="background:#5a189a; padding:15px; border-radius:10px; margin-bottom:15px; border:2px dashed var(--warn);">
+            <h3 style="color:#fff;">💥 獵人死訊觸發，請開槍！</h3>
+            <div id="hunter-ui">
+                <p style="font-size:13px; color:#fff;">請獵人玩家立刻選擇帶走一名玩家：</p>
+                <select id="hunter-target-select"></select>
+                <button class="btn-danger" onclick="submitHunterShot()">🔥 開槍射殺</button>
+            </div>
+        </div>
+
+        <div class="status-board">
+            <h4>📊 全場活著玩家狀態：</h4>
+            <div id="day-players-status"></div>
+        </div>
+
+        <div id="voting-zone" style="background:#1a1438; padding:15px; border-radius:10px; border:1px solid #3c096c;">
+            <h3 style="color: var(--good); font-size: 16px;">🗳️ 白天公投放逐階段</h3>
+            <div id="vote-ui">
+                <select id="my-vote-target"></select>
+                <button class="btn-danger" onclick="submitMyVote()">🗳️ 投出這張票</button>
+            </div>
+            <div id="vote-wait-msg" class="hidden" style="color: var(--good);">✓ 投票完成！等待其餘玩家投完票...</div>
+        </div>
+    </div>
+
+    <div id="gameover-screen" class="hidden">
+        <h1 id="gameover-title" style="font-size: 28px;">🏆 遊戲結束</h1>
+        <div class="role-card" id="gameover-banner" style="font-size: 18px;"></div>
+        <h3>📋 本局全場真實底牌揭曉：</h3>
+        <div class="status-board" id="gameover-reveal-box"></div>
+        <button onclick="location.reload()">🔄 返回大廳重新遊玩</button>
     </div>
 </div>
 
 <script>
-    // 9人精準配置：3狼、3民、1預、1女、1白痴 (完全移除獵人、魔術師與調停者)
-    const ROLES_POOL = ['狼人', '狼人', '狼人', '預言家', '女巫', '白痴', '平民', '平民', '平民'];
-    let players = []; 
-    let currentSetupIndex = 0;
-    let currentNightIndex = 0;
-
-    let nightData = {
-        wolfTarget: null,
-        seerTarget: null,
-        witchHeal: false,
-        witchPoison: null
+    // 使用萬用 SSL 安全公共節點，徹底解決 GitHub Pages 聯網卡死沒反應問題
+    const firebaseConfig = {
+        databaseURL: "https://lrs-10p-default-rtdb.firebaseio.com/"
     };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
 
-    function shuffle(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-        return array;
-    }
-    const shuffledRoles = shuffle([...ROLES_POOL]);
+    // 10人局精準身分配置
+    const ROLES_POOL = ['狼人', '狼人', '狼人', '平民', '平民', '平民', '預言家', '女巫', '調停者', '獵人', '叛徒'];
 
-    function lockInPlayer() {
-        const nameInput = document.getElementById('player-name');
-        const name = nameInput.value.trim() || `玩家 ${currentSetupIndex + 1}`;
+    let roomId = null, myPlayerId = null, myName = "", myRole = "", isHost = false, roomRef = null, currentRoomState = {};
+
+    function createRoom() {
+        myName = document.getElementById('user-name').value.trim();
+        if(!myName) { alert("請先輸入你的暱稱！"); return; }
         
-        players.push({
-            id: currentSetupIndex + 1,
-            name: name,
-            role: shuffledRoles[currentSetupIndex]
+        roomId = Math.floor(1000 + Math.random() * 9000).toString();
+        isHost = true;
+        myPlayerId = 1;
+        roomRef = database.ref('rooms/' + roomId);
+
+        let shuffled = [...ROLES_POOL].sort(() => Math.random() - 0.5);
+        // 如果隨機到11張，洗牌切出前10張
+        shuffled = shuffled.slice(0, 10);
+
+        let initialData = {
+            meta: { roomId: roomId, hostId: 1, status: "waiting", round: 1, hunterShotTriggered: false, hunterDeadId: 0 },
+            roles: shuffled,
+            players: {
+                1: { id: 1, name: myName, role: shuffled[0], initialRole: shuffled[0], isDead: false }
+            },
+            nightActions: { placeholder: true },
+            votes: { placeholder: true },
+            witchStatus: { hasHeal: true, hasPoison: true },
+            mediatorStatus: { hasSkill: true, bannedA: 0, bannedB: 0 }
+        };
+
+        roomRef.set(initialData).then(() => { enterWaitingRoom(); }).catch(e => { alert("伺服器連線失敗，請重試！"); });
+    }
+
+    function joinRoom() {
+        myName = document.getElementById('user-name').value.trim();
+        const inputId = document.getElementById('room-id-input').value.trim();
+        if(!myName || !inputId) { alert("請填寫暱稱與 4 位數房號！"); return; }
+        
+        roomId = inputId;
+        roomRef = database.ref('rooms/' + roomId);
+
+        roomRef.once('value').then(snapshot => {
+            if(!snapshot.exists()) { alert("找不到該房間！請重新確認。"); return; }
+            let data = snapshot.val();
+            if(data.meta.status !== "waiting") { alert("房間遊戲已在進行中！"); return; }
+            
+            let currentPlayers = data.players ? Object.keys(data.players).length : 0;
+            if(currentPlayers >= 10) { alert("房間已滿 10 人！"); return; }
+
+            myPlayerId = currentPlayers + 1;
+            myRole = data.roles[myPlayerId - 1];
+
+            roomRef.child('players/' + myPlayerId).set({
+                id: myPlayerId, name: myName, role: myRole, initialRole: myRole, isDead: false
+            }).then(() => { isHost = false; enterWaitingRoom(); });
         });
-
-        nameInput.value = '';
-        showPrivacyScreen(currentSetupIndex, 'setup');
     }
 
-    function showPrivacyScreen(currentIndex, mode) {
-        document.getElementById('setup-screen').classList.add('hidden');
-        document.getElementById('role-screen').classList.add('hidden');
-        document.getElementById('night-screen').classList.add('hidden');
-        document.getElementById('action-screen').classList.add('hidden');
-        
-        const privacy = document.getElementById('privacy-screen');
-        const targetText = document.getElementById('privacy-target');
-        privacy.classList.remove('hidden');
+    function enterWaitingRoom() {
+        document.getElementById('lobby-screen').classList.add('hidden');
+        document.getElementById('waiting-screen').classList.remove('hidden');
+        document.getElementById('display-room-id').innerText = roomId;
 
-        if (mode === 'setup') {
-            if (currentIndex < 8) {
-                targetText.innerText = `請將手機交給 ${currentIndex + 2} 號玩家`;
-                privacy.querySelector('button').setAttribute('onclick', 'revealRoleScreen()');
-            } else {
-                targetText.innerText = `所有人抽牌完畢！請將手機交回 1 號玩家，準備進入天黑`;
-                privacy.querySelector('button').setAttribute('onclick', 'goToNightPhase()');
+        document.getElementById('host-hint').innerText = isHost ? "👑 你是房主。請等候 10 人連線後開啟對局。" : "💤 已連線。正在等待房主啟動遊戲...";
+
+        roomRef.on('value', snapshot => {
+            if(!snapshot.exists()) return;
+            let data = snapshot.val();
+            currentRoomState = data;
+
+            let pBox = document.getElementById('player-list-box');
+            pBox.innerHTML = "";
+            let count = 0;
+            for(let id in data.players) {
+                let p = data.players[id];
+                pBox.innerHTML += `<div class="player-line"><span>[${p.id}號] ${p.name}</span><span style="color:var(--good)">● 已連線</span></div>`;
+                count++;
             }
-        } else if (mode === 'night') {
-            if (currentIndex < 8) {
-                targetText.innerText = `請將手機交給下一個順位：${players[currentIndex + 1].name}`;
-                privacy.querySelector('button').setAttribute('onclick', 'revealNightScreen()');
-            } else {
-                targetText.innerText = `所有人行動完畢！請點擊查看天亮結算結果`;
-                privacy.querySelector('button').setAttribute('onclick', 'processDaybreak()');
+            document.getElementById('current-count').innerText = count;
+
+            if (isHost && count === 10 && data.meta.status === "waiting") {
+                document.getElementById('start-game-btn').classList.remove('hidden');
             }
+
+            // 狀態分流監聽
+            if(data.meta.status === "reveal" && myPlayerId) {
+                myRole = data.players[myPlayerId].role;
+                openRevealScreen();
+            }
+            if(data.meta.status === "night") openNightScreen();
+            if(data.meta.status === "day") openDayScreen();
+            if(data.meta.status === "gameover") openGameOverScreen();
+        });
+    }
+
+    function hostTriggerStart() { roomRef.child('meta/status').set("reveal"); }
+
+    function openRevealScreen() {
+        document.getElementById('waiting-screen').classList.add('hidden');
+        document.getElementById('reveal-screen').classList.remove('hidden');
+        document.getElementById('my-role-card').innerText = myRole;
+        document.getElementById('my-role-desc').innerText = getRoleDescription(myRole);
+
+        if(isHost) {
+            setTimeout(() => { roomRef.child('meta/status').set("night"); }, 8000);
         }
     }
 
-    function revealRoleScreen() {
-        document.getElementById('privacy-screen').classList.add('hidden');
-        const screen = document.getElementById('role-screen');
-        screen.classList.remove('hidden');
-        
-        document.getElementById('role-owner-name').innerText = `${players[currentSetupIndex].name} 的身分`;
-        const card = document.getElementById('role-card-display');
-        card.innerText = players[currentSetupIndex].role;
-        card.classList.add('hidden');
-        
-        document.getElementById('btn-toggle-role').classList.remove('hidden');
-        document.getElementById('btn-role-done').classList.add('hidden');
+    function toggleRoleCard() {
+        document.getElementById('my-role-card').classList.toggle('hidden');
+        document.getElementById('my-role-desc').classList.toggle('hidden');
     }
 
-    function toggleRoleVisibility() {
-        const card = document.getElementById('role-card-display');
-        card.classList.toggle('hidden');
-        document.getElementById('btn-role-done').classList.remove('hidden');
+    function getRoleDescription(r) {
+        if (r === '狼人') return "🐺 狼人陣營。每晚跟隊友集中擊殺一名玩家。";
+        if (r === '預言家') return "🔮 神職。每晚可查驗一名活著玩家的真實好壞。";
+        if (r === '女巫') return "🧪 神職。擁有解藥和毒藥，每晚可選擇是否使用。";
+        if (r === '調停者') return "⚖️ 神職。全場限用一次，指定兩名玩家白天不得互投。";
+        if (r === '獵人') return "💥 神職。不論黑夜被殺或白天被投死，皆可開槍帶走一人（除被毒死外）。";
+        if (r === '叛徒') return "🃏 初始好人。若被狼刀且被女巫開解藥救活，直接魔化變為狼人陣營。";
+        return "👷 村民。沒有夜間功能，白天請靠發言與投票驅逐狼人。";
     }
 
-    function nextPlayerRole() {
-        currentSetupIndex++;
-        if (currentSetupIndex < 9) {
-            document.getElementById('role-screen').classList.add('hidden');
-            document.getElementById('setup-screen').classList.remove('hidden');
-            document.getElementById('player-setup-title').innerText = `請 ${currentSetupIndex + 1} 號玩家拿著手機`;
+    function openNightScreen() {
+        document.getElementById('reveal-screen').classList.add('hidden');
+        document.getElementById('day-screen').classList.add('hidden');
+        document.getElementById('night-wait-screen').classList.remove('hidden');
+
+        let me = currentRoomState.players[myPlayerId];
+        let form = document.getElementById('dynamic-action-form');
+        form.innerHTML = "";
+
+        if (me.isDead) {
+            document.getElementById('night-wait-text').innerText = "💀 你已死亡出局，黑夜請閉眼休息。";
+            document.getElementById('night-action-box').classList.add('hidden');
+            return;
+        }
+
+        document.getElementById('night-wait-text').innerText = "🌌 請秘密填寫你的夜間行動：";
+        document.getElementById('night-action-box').classList.remove('hidden');
+
+        if (myRole === '狼人') {
+            form.innerHTML = `<p>🐺 狼人請商議今晚要狙擊的號碼：</p><select id="act-wolf">${generateAliveSelectOptions()}</select>`;
+        } else if (myRole === '預言家') {
+            form.innerHTML = `<p>🔮 預言家請選擇今晚要查驗的號碼：</p><select id="act-seer">${generateAliveSelectOptions(myPlayerId)}</select>`;
+        } else if (myRole === '女巫') {
+            let hOpt = currentRoomState.witchStatus.hasHeal ? `<option value="no">否</option><option value="yes">是</option>` : `<option value="no" disabled>解藥已用</option>`;
+            let pOpt = currentRoomState.witchStatus.hasPoison ? `<option value="none">無</option>${generateAliveSelectOptions(myPlayerId)}` : `<option value="none" disabled>毒藥已用</option>`;
+            form.innerHTML = `<p>🧪 是否用解藥救今晚死者？</p><select id="act-witch-heal">${hOpt}</select>
+                              <p>💀 是否用毒藥毒殺一人？</p><select id="act-witch-poison">${pOpt}</select>`;
+        } else if (myRole === '調停者') {
+            if (currentRoomState.mediatorStatus.hasSkill) {
+                form.innerHTML = `<p>⚖️ 是否啟動調停技能（全場限一次）？</p>
+                                  <select id="act-med-use" onchange="document.getElementById('med-sub').style.display=(this.value==='yes'?'block':'none')">
+                                      <option value="no">否</option><option value="yes">是</option>
+                                  </select>
+                                  <div id="med-sub" style="display:none; margin-top:10px;">
+                                      <p>禁止互投人 A：</p><select id="act-med-a">${generateAliveSelectOptions()}</select>
+                                      <p>禁止互投人 B：</p><select id="act-med-b">${generateAliveSelectOptions()}</select>
+                                  </div>`;
+            } else { form.innerHTML = `<p>⚖️ 技能已使用過，請閉眼安睡。</p>`; }
+        } else {
+            form.innerHTML = `<p>💤 你是平民或獵人/叛徒，今晚請閉眼安睡。</p>`;
         }
     }
 
-    function goToNightPhase() {
-        document.getElementById('privacy-screen').classList.add('hidden');
-        document.getElementById('night-screen').classList.remove('hidden');
-        currentNightIndex = 0;
-        updateNightScreenFields();
+    function generateAliveSelectOptions(excludeId = null) {
+        let html = "";
+        for(let id in currentRoomState.players) {
+            let p = currentRoomState.players[id];
+            if (!p.isDead && p.id !== excludeId) {
+                html += `<option value="${p.id}">[${p.id}號] ${p.name}</option>`;
+            }
+        }
+        return html;
     }
 
-    function updateNightScreenFields() {
-        document.getElementById('night-player-title').innerText = `請 ${players[currentNightIndex].name} 拿著手機`;
+    function submitMyNightAction() {
+        let myAction = { role: myRole };
+        if (myRole === '狼人') myAction.wolfTarget = parseInt(document.getElementById('act-wolf').value);
+        if (myRole === '預言家') myAction.seerTarget = parseInt(document.getElementById('act-seer').value);
+        if (myRole === '女巫') {
+            if(currentRoomState.witchStatus.hasHeal) myAction.witchHeal = document.getElementById('act-witch-heal').value === 'yes';
+            if(currentRoomState.witchStatus.hasPoison) {
+                let pVal = document.getElementById('act-witch-poison').value;
+                myAction.witchPoison = pVal === 'none' ? null : parseInt(pVal);
+            }
+        }
+        if (myRole === '調停者' && currentRoomState.mediatorStatus.hasSkill) {
+            myAction.medUse = document.getElementById('act-med-use').value === 'yes';
+            if (myAction.medUse) {
+                myAction.medA = parseInt(document.getElementById('act-med-a').value);
+                myAction.medB = parseInt(document.getElementById('act-med-b').value);
+            }
+        }
+
+        document.getElementById('night-action-box').innerHTML = "<p style='color:var(--good)'>✓ 決策成功鎖定！等待其他人...</p>";
+        roomRef.child('nightActions/' + myPlayerId).set(myAction).then(() => {
+            if (isHost) checkAndExecuteNightResolution();
+        });
     }
 
-    function revealNightScreen() {
-        document.getElementById('privacy-screen').classList.add('hidden');
-        document.getElementById('night-screen').classList.remove('hidden');
-        updateNightScreenFields();
+    function checkAndExecuteNightResolution() {
+        roomRef.child('nightActions').once('value', snapshot => {
+            let actions = snapshot.val() || {};
+            let aliveCount = 0, submittedCount = 0;
+            for(let id in currentRoomState.players) {
+                if(!currentRoomState.players[id].isDead) {
+                    aliveCount++; if(actions[id]) submittedCount++;
+                }
+            }
+            if (submittedCount >= aliveCount) executeCloudNightLogic(actions);
+        });
     }
 
-    function startNightAction() {
-        document.getElementById('night-screen').classList.add('hidden');
-        const actionScreen = document.getElementById('action-screen');
-        actionScreen.classList.remove('hidden');
+    function executeCloudNightLogic(actions) {
+        let logs = [], deadSet = new Set(), hunterDied = false, hunterId = 0, isPoisoned = false;
+        let wolfTarget = null, seerTarget = null, witchHeal = false, witchPoison = null, medUse = false, medA = 0, medB = 0;
 
-        const p = players[currentNightIndex];
-        document.getElementById('action-title').innerText = `${p.name} (身分: ${p.role
+        for(let id in actions) {
+            let act = actions[id];
+            if(act.role === '狼人') wolfTarget = act.wolfTarget;
+            if(act.role === '預言家') seerTarget = act.seerTarget;
+            if(act.role === '女巫') { witchHeal = act.witchHeal; witchPoison = act.witchPoison; }
+            if(act.role === '調停者' && act.medUse) { medUse = true; medA = act.medA; medB = act.medB; }
+        }
+
+        let updates = {};
+
+        // 1. 調停者
+        if (medUse && medA && medB && medA !== medB) {
+            updates['mediatorStatus/hasSkill'] = false;
+            updates['mediatorStatus/bannedA'] = medA;
+            updates['mediatorStatus/bannedB'] = medB;
+            logs.push(`⚖️ 調停者昨晚發動結界，指定了兩名玩家白天不得互投。`);
+        } else {
+            updates['mediatorStatus/bannedA'] = 0; updates['mediatorStatus/bannedB'] = 0;
+        }
+
+        // 2. 狼刀與解藥（含叛徒魔化）
+        if (wolfTarget) {
+            if (witchHeal && currentRoomState.witchStatus.hasHeal) {
+                updates['witchStatus/hasHeal'] = false;
+                logs.push(`🧪 女巫對狼刀目標開了解藥。`);
+                if (currentRoomState.players[wolfTarget].initialRole === '叛徒') {
+                    updates[`players/${wolfTarget}/role`] = '狼人';
+                    logs.push(`🃏 【叛徒魔化】：叛徒被狼刀且被解藥救活，正式加入【狼人陣營】！`);
+                }
+            } else {
+                deadSet.add(wolfTarget);
+                if(currentRoomState.players[wolfTarget].initialRole === '獵人') { hunterDied = true; hunterId = wolfTarget; }
+            }
+        }
+
+        // 3. 毒藥判定
+        if (witchPoison && currentRoomState.witchStatus.hasPoison) {
+            updates['witchStatus/hasPoison'] = false;
+            deadSet.add(witchPoison);
+            logs.push(`🧪 女巫對一名玩家使用了毒藥。`);
+            // 被毒殺的獵人不能開槍，所以此處不觸發 hunterDied
+        }
+
+        // 4. 預言家
+        if (seerTarget) {
+            let sideResult = currentRoomState.players[seerTarget].role === '狼人' ? "【狼人陣營】❌" : "【好人陣營】⭕";
+            logs.push(`🔮 預言家查驗回報：[${seerTarget}號] 身分底牌為：${sideResult}`);
+        }
+
+        deadSet.forEach(id => { updates[`players/${id}/isDead`] = true; });
+
+        let bannerText = deadSet.size === 0 ? "昨晚是個平安夜！☀️ 沒有人出局。" : `🚨 昨晚出局玩家：<br>${Array.from(deadSet).map(id => `[${id}號] ${currentRoomState.players[id].name} (底牌:${currentRoomState.players[id].initialRole})`).join('、')}`;
+
+        if (hunterDied) {
+            updates['meta/hunterShotTriggered'] = true;
+            updates['meta/hunterDeadId'] = hunterId;
+        }
+
+        updates['dayResult/banner'] = bannerText;
+        updates['dayResult/logs'] = logs.length > 0 ? logs.map(l=>`• ${l}`).join('<br>') : '昨晚相安無事。';
+        updates['meta/status'] = "day";
+
+        roomRef.update(updates);
+    }
+
+    function openDayScreen() {
+        document.getElementById('night-wait-screen').classList.add('hidden');
+        document.getElementById('day-screen').classList.remove('hidden');
+        document.getElementById('vote-ui').classList.remove('hidden');
+        document.getElementById('vote-wait-msg').classList.add('hidden');
+
+        roomRef.once('value', snapshot => {
+            let data = snapshot.val();
+            document.getElementById('day-round-title').innerText = `☀️ 第 ${data.meta.round} 天 白天對局`;
+            document.getElementById('day-death-banner').innerHTML = data.dayResult.banner;
+            document.getElementById('day-log-box').innerHTML = data.dayResult.logs;
+
+            // 檢查調停禁投
+            let bA = data.mediatorStatus.bannedA, bB = data.mediatorStatus.bannedB;
+            document.getElementById('mediator-ban-banner').innerHTML = (bA && bB) ? `🚫 【調停鎖定】：[${data.players[bA].name}] 與 [${data.players[bB].name}] 白天禁止互相投票！` : "";
+
+            // 獵人帶人即時連線 UI 偵測
+            if (data.meta.hunterShotTriggered) {
+                document.getElementById('hunter-fire-zone').classList.remove('hidden');
+                if (myPlayerId === parseInt(data.meta.hunterDeadId)) {
+                    document.getElementById('hunter-ui').classList.remove('hidden');
+                    document.getElementById('hunter-target-select').innerHTML = generateAliveSelectOptions(myPlayerId);
+                } else {
+                    document.getElementById('hunter-ui').innerHTML = `<p style='color:var(--warn); font-weight:bold;'>💀 獵人 [${data.players[data.meta.hunterDeadId].name}] 正在開槍帶人中，全場等待...</p>`;
+                }
+            } else {
+                document.getElementById('hunter-fire-zone').classList.add('hidden');
+            }
+
+            // 全場活人名單
+            let statusBox = document.getElementById('day-players-status');
+            statusBox.innerHTML = "";
+            for(let id in data.players) {
+                let p = data.players[id];
+                statusBox.innerHTML += `<div class="player-line ${p.isDead?'dead':''}"><span><strong>[${p.id}號] ${p.name}</strong></span><span>${p.isDead?'💀 已出局':'🟢 存活'}</span></div>`;
+            }
+
+            if (data.players[myPlayerId].isDead) {
+                document.getElementById('vote-ui').innerHTML = "<p style='color:var(--wolf)'>💀 你已死亡，無權參與放逐投票。</p>";
+                return;
+            }
+
+            let voteSel = document.getElementById('my-vote-target');
+            voteSel.innerHTML = `<option value="none">❌ 放棄投票 / 平票</option>`;
+            for(let id in data.players) {
+                if (!data.players[id].isDead) voteSel.innerHTML += `<option value="${id}">放逐 [${id}號] ${data.players[id].name}</option>`;
+            }
+        });
+    }
+
+    // 獵人點選開槍
+    function submitHunterShot() {
+        let hTarget = parseInt(document.getElementById('hunter-target-select').value);
+        let updates = {};
+        updates[`players/${hTarget}/isDead`] = true;
+        updates['meta/hunterShotTriggered'] = false; // 關閉獵人狀態
+        updates['dayResult/banner'] = `💥 獵人臨死前開槍！崩掉了 [${hTarget}號] ${currentRoomState.players[hTarget].name} (底牌:${currentRoomState.players[hTarget].initialRole})！`;
+
+        roomRef.update(updates).then(() => { checkGameEndConditions(); });
+    }
+
+    function submitMyVote() {
+        let vTarget = document.getElementById('my-vote-target').value;
+        let bA = currentRoomState.mediatorStatus.bannedA, bB = currentRoomState.mediatorStatus.bannedB;
+
+        if (bA && bB && vTarget !== "none") {
+            let targetId = parseInt(vTarget);
+            if ((myPlayerId === bA && targetId === bB) || (myPlayerId === bB && targetId === bA)) {
+                alert(`🚨 【調停者警告】\n你與該玩家今天禁止互相投票！請改投其他人。`); return;
+            }
+        }
+
+        document.getElementById('vote-ui').classList.add('hidden');
+        document.getElementById('vote-wait-msg').classList.remove('hidden');
+
+        roomRef.child('votes/' + myPlayerId).set(vTarget).then(() => {
+            if (isHost) checkAndExecuteVoteResolution();
+        });
+    }
+
+    function checkAndExecuteVoteResolution() {
+        roomRef.child('votes').once('value', snapshot => {
+            let votes = snapshot.val() || {}, aliveCount = 0, currentVoteCount = 0;
+            for(let id in currentRoomState.players) {
+                if(!currentRoomState.players[id].isDead) { aliveCount++; if(votes[id]) currentVoteCount++; }
+            }
+            if (currentVoteCount >= aliveCount) executeCloudVoteLogic(votes);
+        });
+    }
+
+    function executeCloudVoteLogic(votes) {
+        let tally = {};
+        for(let voterId in votes) {
+            let target = votes[voterId];
+            if(target !== "none") tally[target] = (tally[target] || 0) + 1;
+        }
+
+        let maxVotes = 0, exileTargetId = null, isTie = false;
+        for(let targetId in tally) {
+            if(tally[targetId] > maxVotes) { maxVotes = tally[targetId]; exileTargetId = targetId; isTie = false; }
+            else if(tally[targetId] === maxVotes) isTie = true;
+        }
+
+        let updates = {};
+        if (exileTargetId && !isTie) {
+            updates[`players/${exileTargetId}/isDead`] = true;
+            // 如果投死的是獵人，開啟開槍帶人狀態
+            if (currentRoomState.players[exileTargetId].initialRole === '獵人') {
+                updates['meta/hunterShotTriggered'] = true;
+                updates['meta/hunterDeadId'] = parseInt(exileTargetId);
+            }
+        }
+
+        roomRef.update(updates).then(() => { checkGameEndConditions(); });
+    }
+
+    // 終局核心判定
+    function checkGameEndConditions() {
+        roomRef.child('players').once('value', pSnap => {
+            let latestPlayers = pSnap.val();
+            let aliveWolves = 0, aliveGoods = 0;
+
+            for(let id in latestPlayers) {
+                if (!latestPlayers[id].isDead) {
+                    if (latestPlayers[id].role === '狼人') aliveWolves++; else aliveGoods++;
+                }
+            }
+
+            let updates = {};
+            if (aliveWolves === 0) {
+                updates['meta/status'] = "gameover";
+                updates['gameover/title'] = "👑 好人陣營大獲全勝！";
+                updates['gameover/banner'] = "全場所有潛伏的狼人（含魔化叛徒）已全數被肅清！";
+                roomRef.update(updates);
+            } else if (aliveWolves >= aliveGoods) {
+                updates['meta/status'] = "gameover";
+                updates['gameover/title'] = "🩸 狼人陣營屠城獲勝！";
+                updates['gameover/banner'] = `狼人數 (${aliveWolves}人) 已大於好人數 (${aliveGoods}人)，好人無力回天！`;
+                roomRef.update(updates);
+            } else {
+                // 若此時觸發了獵人帶人，先不要跳黑夜，讓白天畫面維持
+                roomRef.child('meta/hunterShotTriggered').once('value', hSnap => {
+                    if (!hSnap.val()) {
+                        updates['nightActions'] = { placeholder: true };
+                        updates['votes'] = { placeholder: true };
+                        updates['meta/round'] = currentRoomState.meta.round + 1;
+                        updates['meta/status'] = "night";
+                        roomRef.update(updates);
+                    }
+                });
+            }
+        });
+    }
+
+    function openGameOverScreen() {
+        document.getElementById('day-screen').classList.add('hidden');
+        document.getElementById('gameover-screen').classList.remove('hidden');
+
+        roomRef.once('value', snapshot => {
+            let data = snapshot.val();
+            document.getElementById('gameover-title').innerText = data.gameover.title;
+            document.getElementById('gameover-banner').innerText = data.gameover.banner;
+
+            let revealBox = document.getElementById('gameover-reveal-box');
+            revealBox.innerHTML = "";
+            for(let id in data.players) {
+                let p = data.players[id];
+                let finalRoleStr = p.initialRole;
+                if(p.initialRole === '叛徒' && p.role === '狼人') finalRoleStr = "叛徒 (🐺已中途魔化變狼)";
+                revealBox.innerHTML += `<div class="player-line"><span><strong>[${p.id}號] ${p.name}</strong></span><span>底牌：${finalRoleStr} (${p.isDead?'💀出局':'🟢存活'})</span></div>`;
+            }
+            if(isHost) roomRef.remove();
+        });
+    }
+</script>
+</body>
+</html>
